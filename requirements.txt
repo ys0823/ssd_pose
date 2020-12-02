@@ -1,0 +1,5 @@
+torchvision >=0.3
+yacs
+tqdm
+opencv-python
+vizer
