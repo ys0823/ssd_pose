@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from ssd.layers import L2Norm
 from ssd.modeling import registry
 from ssd.utils.model_zoo import load_state_dict_from_url
-from ssd.layers.SKconv import SKConv
+from ssd.layers.SKconv import SKConv,SKConv_s
 
 model_urls = {
     'vgg': 'https://s3.amazonaws.com/amdegroot-models/vgg16_reducedfc.pth',
@@ -21,6 +21,7 @@ def add_vgg(cfg, batch_norm=False):
         elif v == 'C':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2, ceil_mode=True)]
         else:
+            # conv2d = SKConv(in_channels, v)  #change here
             conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
@@ -28,7 +29,8 @@ def add_vgg(cfg, batch_norm=False):
                 layers += [conv2d, nn.ReLU(inplace=True)]
             in_channels = v
     pool5 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-    conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)
+    conv6 = SKConv_s(512, 1024) #change here
+    # conv6 = nn.Conv2d(512, 1024, kernel_size=3, padding=6, dilation=6)
     conv7 = nn.Conv2d(1024, 1024, kernel_size=1)
     layers += [pool5, conv6,
                nn.ReLU(inplace=True), conv7, nn.ReLU(inplace=True)]
@@ -43,8 +45,16 @@ def add_extras(cfg, i, size=300):
         if in_channels != 'S':
             if v == 'S':
                 layers += [nn.Conv2d(in_channels, cfg[k + 1], kernel_size=(1, 3)[flag], stride=2, padding=1)]
+                # if flag:
+                #     layers += [SKConv(in_channels, cfg[k + 1])]
+                # else:
+                #     layers += [nn.Conv2d(in_channels, cfg[k + 1], kernel_size=(1, 3)[flag], stride=2, padding=1)]
             else:
                 layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
+                # if flag:
+                #     layers += [SKConv(in_channels, v)]
+                # else:
+                #     layers += [nn.Conv2d(in_channels, v, kernel_size=(1, 3)[flag])]
             flag = not flag
         in_channels = v
     # if size == 512:
@@ -74,7 +84,7 @@ class Enrich_VGG(nn.Module):
 
         self.vgg = nn.ModuleList(add_vgg(vgg_config))
         self.extras = nn.ModuleList(add_extras(extras_config, i=1024, size=size))
-        self.Norm1 = SKConv(512,512,stride=1)
+        self.Norm1 = SKConv_s(512,512,stride=1)
         self.Norm2 = SKConv(1024, 1024, stride=1)
         # self.l2_norm = L2Norm(512, scale=20)
         self.reset_parameters()
@@ -86,7 +96,9 @@ class Enrich_VGG(nn.Module):
                 nn.init.zeros_(m.bias)
 
     def init_from_pretrain(self, state_dict):
-        self.vgg.load_state_dict(state_dict)
+        state_dict = {k: v for k, v in state_dict.items() if k not in ['31.weight', '31.bias']}
+        self.vgg.load_state_dict(state_dict, strict=False)
+
 
     def forward(self, x):
         features = []

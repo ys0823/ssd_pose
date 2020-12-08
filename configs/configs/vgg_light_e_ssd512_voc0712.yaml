@@ -1,6 +1,7 @@
 MODEL:
   NUM_CLASSES: 4
   BACKBONE:
+    NAME: enrich_vgg
     OUT_CHANNELS: (512, 1024, 512, 256)
   PRIORS:
     FEATURE_MAPS: [64, 32, 16, 8]
@@ -24,4 +25,4 @@ SOLVER:
   BATCH_SIZE: 24
   LR: 1e-4
 
-OUTPUT_DIR: 'outputs/vgg_ssd512_voc0712'
+OUTPUT_DIR: 'outputs/vgg_light_e_ssd512_voc0712'
